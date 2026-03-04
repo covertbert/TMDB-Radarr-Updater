@@ -6,13 +6,11 @@ type MovieStatusType = "announced" | "inCinemas" | "released" | "preDB";
 interface Config {
   tmdbBearerToken?: string;
   tmdbApiKey?: string;
-  tmdbRegion: string;
   tmdbLanguage: string;
   tmdbMinScore: number;
   tmdbMinVoteCount: number;
   tmdbReleaseWindowDays: number;
-  tmdbDiscoverPages: number;
-  tmdbNowPlayingPages: number;
+  tmdbPrimaryReleaseDateGte: string;
   radarrUrl: string;
   radarrApiKey: string;
   radarrRootFolderPath: string;
@@ -116,16 +114,15 @@ function optionalString(name: string): string | undefined {
   return value ?? undefined;
 }
 
-function parseNumber(
-  value: string | undefined,
-  fallback: number,
-  envName: string,
-  min?: number
-): number {
-  if (!value) {
-    return fallback;
+function requiredDateString(name: string): string {
+  const value = requiredString(name);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`Invalid date value in ${name}: ${value}. Use YYYY-MM-DD format.`);
   }
+  return value;
+}
 
+function parseNumber(value: string, envName: string, min?: number): number {
   const parsed = Number(value);
   if (Number.isNaN(parsed) || !Number.isFinite(parsed)) {
     throw new TypeError(`Invalid numeric value in ${envName}: ${value}`);
@@ -138,11 +135,7 @@ function parseNumber(
   return parsed;
 }
 
-function parseBoolean(value: string | undefined, fallback: boolean): boolean {
-  if (!value) {
-    return fallback;
-  }
-
+function parseBoolean(value: string, envName: string): boolean {
   const lowered = value.trim().toLowerCase();
   if (["1", "true", "yes", "y", "on"].includes(lowered)) {
     return true;
@@ -152,7 +145,7 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
     return false;
   }
 
-  throw new Error(`Invalid boolean value: ${value}`);
+  throw new Error(`Invalid boolean value in ${envName}: ${value}`);
 }
 
 function normalizeUrl(baseUrl: string): string {
@@ -163,11 +156,7 @@ function normalizePath(path: string): string {
   return path.replace(/\/+$/, "");
 }
 
-function normalizeMinimumAvailability(value: string | undefined): MovieStatusType {
-  if (!value) {
-    return "released";
-  }
-
+function normalizeMinimumAvailability(value: string): MovieStatusType {
   const raw = value.trim();
   const lowered = raw.toLowerCase();
   if (lowered === "announced") {
@@ -202,14 +191,12 @@ function readConfig(): Config {
   const radarrQualityProfileIdRaw = optionalString("RADARR_QUALITY_PROFILE_ID");
   const radarrQualityProfileName = optionalString("RADARR_QUALITY_PROFILE_NAME");
   const tmdbMinVoteCountConfigured = parseNumber(
-    process.env.TMDB_MIN_VOTE_COUNT,
-    300,
+    requiredString("TMDB_MIN_VOTE_COUNT"),
     "TMDB_MIN_VOTE_COUNT",
     0
   );
   const tmdbReleaseWindowDaysConfigured = parseNumber(
-    process.env.TMDB_RELEASE_WINDOW_DAYS,
-    30,
+    requiredString("TMDB_RELEASE_WINDOW_DAYS"),
     "TMDB_RELEASE_WINDOW_DAYS",
     1
   );
@@ -220,31 +207,24 @@ function readConfig(): Config {
   return {
     tmdbBearerToken,
     tmdbApiKey,
-    tmdbRegion: process.env.TMDB_REGION?.trim() ?? "GB",
-    tmdbLanguage: process.env.TMDB_LANGUAGE?.trim() ?? "en-US",
-    tmdbMinScore: parseNumber(process.env.TMDB_MIN_SCORE, 7.5, "TMDB_MIN_SCORE", 0),
+    tmdbLanguage: requiredString("TMDB_LANGUAGE"),
+    tmdbMinScore: parseNumber(requiredString("TMDB_MIN_SCORE"), "TMDB_MIN_SCORE", 0),
     tmdbMinVoteCount: Math.max(tmdbMinVoteCountConfigured, 300),
     tmdbReleaseWindowDays: Math.max(1, Math.floor(tmdbReleaseWindowDaysConfigured)),
-    tmdbDiscoverPages: parseNumber(process.env.TMDB_DISCOVER_PAGES, 3, "TMDB_DISCOVER_PAGES", 1),
-    tmdbNowPlayingPages: parseNumber(
-      process.env.TMDB_NOW_PLAYING_PAGES,
-      5,
-      "TMDB_NOW_PLAYING_PAGES",
-      1
-    ),
+    tmdbPrimaryReleaseDateGte: requiredDateString("TMDB_PRIMARY_RELEASE_DATE_GTE"),
     radarrUrl: normalizeUrl(requiredString("RADARR_URL")),
     radarrApiKey: requiredString("RADARR_API_KEY"),
     radarrRootFolderPath: requiredString("RADARR_ROOT_FOLDER_PATH"),
     radarrQualityProfileId: radarrQualityProfileIdRaw
-      ? parseNumber(radarrQualityProfileIdRaw, 0, "RADARR_QUALITY_PROFILE_ID", 1)
+      ? parseNumber(radarrQualityProfileIdRaw, "RADARR_QUALITY_PROFILE_ID", 1)
       : undefined,
     radarrQualityProfileName,
-    radarrSearchOnAdd: parseBoolean(process.env.RADARR_SEARCH_ON_ADD, true),
-    radarrMonitored: parseBoolean(process.env.RADARR_MONITORED, true),
+    radarrSearchOnAdd: parseBoolean(requiredString("RADARR_SEARCH_ON_ADD"), "RADARR_SEARCH_ON_ADD"),
+    radarrMonitored: parseBoolean(requiredString("RADARR_MONITORED"), "RADARR_MONITORED"),
     radarrMinimumAvailability: normalizeMinimumAvailability(
-      process.env.RADARR_MINIMUM_AVAILABILITY
+      requiredString("RADARR_MINIMUM_AVAILABILITY")
     ),
-    dryRun: parseBoolean(process.env.DRY_RUN, true)
+    dryRun: parseBoolean(requiredString("DRY_RUN"), "DRY_RUN")
   };
 }
 
@@ -312,29 +292,7 @@ class TmdbClient {
     });
   }
 
-  public async fetchNowPlayingIds(maxPages: number): Promise<Set<number>> {
-    const ids = new Set<number>();
-
-    for (let page = 1; page <= maxPages; page += 1) {
-      const response = await this.get<TmdbPagedResponse<TmdbMovie>>("/movie/now_playing", {
-        language: this.config.tmdbLanguage,
-        page,
-        region: this.config.tmdbRegion
-      });
-
-      for (const movie of response.results) {
-        ids.add(movie.id);
-      }
-
-      if (page >= response.total_pages) {
-        break;
-      }
-    }
-
-    return ids;
-  }
-
-  public async fetchDigitalReleases(maxPages: number): Promise<TmdbMovie[]> {
+  public async fetchDigitalReleases(): Promise<TmdbMovie[]> {
     const windowEndDate = new Date();
     const windowStartDate = new Date(windowEndDate);
     windowStartDate.setUTCDate(
@@ -344,17 +302,17 @@ class TmdbClient {
     const digitalReleaseDateStart = windowStartDate.toISOString().slice(0, 10);
     const movies = new Map<number, TmdbMovie>();
 
-    for (let page = 1; page <= maxPages; page += 1) {
+    for (let page = 1; ; page += 1) {
       const response = await this.get<TmdbPagedResponse<TmdbMovie>>("/discover/movie", {
         include_adult: false,
         include_video: false,
         language: this.config.tmdbLanguage,
         page,
-        region: this.config.tmdbRegion,
         sort_by: "release_date.desc",
         with_release_type: 4,
         "release_date.gte": digitalReleaseDateStart,
         "release_date.lte": digitalReleaseDateEnd,
+        "primary_release_date.gte": this.config.tmdbPrimaryReleaseDateGte,
         "vote_average.gte": this.config.tmdbMinScore,
         "vote_count.gte": this.config.tmdbMinVoteCount
       });
@@ -539,15 +497,13 @@ async function runSync(
     log("INFO", "DRY_RUN is enabled; Radarr add requests will be logged only.");
   }
 
-  const [existingTmdbIds, nowPlayingIds, digitalCandidates] = await Promise.all([
+  const [existingTmdbIds, digitalCandidates] = await Promise.all([
     radarrClient.fetchExistingTmdbIds(),
-    tmdbClient.fetchNowPlayingIds(config.tmdbNowPlayingPages),
-    tmdbClient.fetchDigitalReleases(config.tmdbDiscoverPages)
+    tmdbClient.fetchDigitalReleases()
   ]);
 
   const candidates = digitalCandidates
     .filter((movie) => !existingTmdbIds.has(movie.id))
-    .filter((movie) => !nowPlayingIds.has(movie.id))
     .sort((a, b) => b.release_date.localeCompare(a.release_date));
 
   log(
