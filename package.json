@@ -7,13 +7,30 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "check": "npm run build"
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "npm run lint -- --fix",
+    "format": "prettier . --check",
+    "format:write": "prettier . --write",
+    "prepare": "husky",
+    "check": "npm run build && npm run lint && npm run format"
   },
   "engines": {
     "node": ">=20.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.3",
     "@types/node": "^22.13.14",
-    "typescript": "^5.8.2"
+    "eslint": "^9.39.3",
+    "eslint-plugin-unicorn": "^56.0.1",
+    "globals": "^17.4.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.2",
+    "prettier": "^3.8.1",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.56.1"
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,ts,json,yml,yaml,md}": "prettier --write",
+    "*.ts": "eslint --fix"
   }
 }

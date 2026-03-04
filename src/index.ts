@@ -95,9 +95,7 @@ function loadDotEnvFile(): void {
       value = value.slice(1, -1);
     }
 
-    if (process.env[key] === undefined) {
-      process.env[key] = value;
-    }
+    process.env[key] ??= value;
   }
 }
 
@@ -115,7 +113,7 @@ function requiredString(name: string): string {
 
 function optionalString(name: string): string | undefined {
   const value = process.env[name]?.trim();
-  return value ? value : undefined;
+  return value ?? undefined;
 }
 
 function parseNumber(
@@ -130,7 +128,7 @@ function parseNumber(
 
   const parsed = Number(value);
   if (Number.isNaN(parsed) || !Number.isFinite(parsed)) {
-    throw new Error(`Invalid numeric value in ${envName}: ${value}`);
+    throw new TypeError(`Invalid numeric value in ${envName}: ${value}`);
   }
 
   if (min !== undefined && parsed < min) {
@@ -210,8 +208,8 @@ function readConfig(): Config {
   return {
     tmdbBearerToken,
     tmdbApiKey,
-    tmdbRegion: process.env.TMDB_REGION?.trim() || "GB",
-    tmdbLanguage: process.env.TMDB_LANGUAGE?.trim() || "en-US",
+    tmdbRegion: process.env.TMDB_REGION?.trim() ?? "GB",
+    tmdbLanguage: process.env.TMDB_LANGUAGE?.trim() ?? "en-US",
     tmdbMinScore: parseNumber(process.env.TMDB_MIN_SCORE, 7.5, "TMDB_MIN_SCORE", 0),
     tmdbMinVoteCount: parseNumber(process.env.TMDB_MIN_VOTE_COUNT, 0, "TMDB_MIN_VOTE_COUNT", 0),
     tmdbDiscoverPages: parseNumber(process.env.TMDB_DISCOVER_PAGES, 3, "TMDB_DISCOVER_PAGES", 1),
@@ -230,8 +228,15 @@ function readConfig(): Config {
     radarrQualityProfileName,
     radarrSearchOnAdd: parseBoolean(process.env.RADARR_SEARCH_ON_ADD, true),
     radarrMonitored: parseBoolean(process.env.RADARR_MONITORED, true),
-    radarrMinimumAvailability: normalizeMinimumAvailability(process.env.RADARR_MINIMUM_AVAILABILITY),
-    pollIntervalHours: parseNumber(process.env.POLL_INTERVAL_HOURS, 24, "POLL_INTERVAL_HOURS", 0.25),
+    radarrMinimumAvailability: normalizeMinimumAvailability(
+      process.env.RADARR_MINIMUM_AVAILABILITY
+    ),
+    pollIntervalHours: parseNumber(
+      process.env.POLL_INTERVAL_HOURS,
+      24,
+      "POLL_INTERVAL_HOURS",
+      0.25
+    ),
     runOnce: parseBoolean(process.env.RUN_ONCE, false)
   };
 }
@@ -241,9 +246,12 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   try {
     response = await fetch(url, init);
   } catch (error) {
-    const cause = error instanceof Error ? String((error as Error & { cause?: unknown }).cause) : "";
+    const cause =
+      error instanceof Error ? String((error as Error & { cause?: unknown }).cause) : "";
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Network error while requesting ${url}: ${message}${cause ? ` | cause: ${cause}` : ""}`);
+    throw new Error(
+      `Network error while requesting ${url}: ${message}${cause ? ` | cause: ${cause}` : ""}`
+    );
   }
 
   const bodyText = await response.text();
@@ -286,7 +294,10 @@ class TmdbClient {
     return `${this.baseUrl}${path}?${searchParams.toString()}`;
   }
 
-  private async get<T>(path: string, params: Record<string, string | number | boolean>): Promise<T> {
+  private async get<T>(
+    path: string,
+    params: Record<string, string | number | boolean>
+  ): Promise<T> {
     const url = this.buildUrl(path, params);
     return fetchJson<T>(url, {
       method: "GET",
@@ -343,7 +354,7 @@ class TmdbClient {
       }
     }
 
-    return Array.from(movies.values());
+    return [...movies.values()];
   }
 }
 
@@ -369,7 +380,10 @@ class RadarrClient {
     return url.toString();
   }
 
-  private async get<T>(path: string, params?: Record<string, string | number | boolean>): Promise<T> {
+  private async get<T>(
+    path: string,
+    params?: Record<string, string | number | boolean>
+  ): Promise<T> {
     return fetchJson<T>(this.buildUrl(path, params), {
       method: "GET",
       headers: this.headers
@@ -587,7 +601,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
+main().catch((error: unknown) => {
   log("ERROR", `Fatal error: ${String(error)}`);
   process.exit(1);
 });

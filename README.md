@@ -3,12 +3,14 @@
 This container polls TMDb for digitally released movies and adds them to Radarr when their TMDb score is above your threshold.
 
 Rules implemented:
+
 - Uses TMDb discover with `with_release_type=4` (digital release).
 - Excludes movies currently returned by TMDb `now_playing` (proxy for "still in theatres").
 - Applies rating threshold (`TMDB_MIN_SCORE`, default `7.5`).
 - Skips anything already in Radarr by `tmdbId`.
 
 ## Required API docs used
+
 - TMDb API (`/3/discover/movie`, `/3/movie/now_playing`, auth): https://developer.themoviedb.org/
 - Radarr API (`/api/v3/movie`, `/api/v3/movie/lookup/tmdb`, `/api/v3/qualityprofile`, `/api/v3/rootfolder`): https://github.com/devopsarr/radarr-go
 
@@ -39,6 +41,7 @@ Important: because the service sets its own `environment`, the values from `x-co
 ## Environment variables
 
 Required:
+
 - `TMDB_BEARER_TOKEN` or `TMDB_API_KEY`
 - `RADARR_URL`
 - `RADARR_API_KEY`
@@ -46,6 +49,7 @@ Required:
 - `RADARR_QUALITY_PROFILE_ID` or `RADARR_QUALITY_PROFILE_NAME`
 
 Optional (defaults):
+
 - `TMDB_REGION=GB`
 - `TMDB_LANGUAGE=en-US`
 - `TMDB_MIN_SCORE=7.5`
