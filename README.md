@@ -5,7 +5,7 @@ This container polls TMDb for digitally released movies and adds them to Radarr 
 Rules implemented:
 
 - Uses TMDb discover with `with_release_type=4` (digital release).
-- Limits discover results to an inclusive 7-day digital release window (`with_release_type=4`, `release_date.gte`, `release_date.lte`).
+- Limits discover results to an inclusive digital release window (`with_release_type=4`, `release_date.gte`, `release_date.lte`, default 30 days via `TMDB_RELEASE_WINDOW_DAYS`).
 - Excludes movies currently returned by TMDb `now_playing` (proxy for "still in theatres").
 - Applies rating threshold (`TMDB_MIN_SCORE`, default `7.5`).
 - Requires at least `300` TMDb votes (`TMDB_MIN_VOTE_COUNT`, values lower than `300` are clamped).
@@ -56,17 +56,20 @@ Optional (defaults):
 - `TMDB_LANGUAGE=en-US`
 - `TMDB_MIN_SCORE=7.5`
 - `TMDB_MIN_VOTE_COUNT=300`
+- `TMDB_RELEASE_WINDOW_DAYS=30`
 - `TMDB_DISCOVER_PAGES=3`
 - `TMDB_NOW_PLAYING_PAGES=5`
 - `RADARR_SEARCH_ON_ADD=true`
 - `RADARR_MONITORED=true`
 - `RADARR_MINIMUM_AVAILABILITY=released`
+- `DRY_RUN=true` (when `true`, logs what would be added and does not call Radarr add)
 - `POLL_INTERVAL_HOURS=24`
 - `RUN_ONCE=false`
 
 ## Notes
 
 - `RUN_ONCE=false` runs forever and sleeps between syncs.
-- Weekly cadence is supported by the built-in 7-day TMDb release window.
+- Weekly cadence is supported; set `TMDB_RELEASE_WINDOW_DAYS=7` for strict weekly-only matching.
+- Set `DRY_RUN=false` when you want real Radarr add calls.
 - `RUN_ONCE=true` is useful for testing.
 - This project uses TMDb data but is not endorsed or certified by TMDb.

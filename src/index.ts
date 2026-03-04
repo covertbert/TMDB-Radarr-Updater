@@ -10,6 +10,7 @@ interface Config {
   tmdbLanguage: string;
   tmdbMinScore: number;
   tmdbMinVoteCount: number;
+  tmdbReleaseWindowDays: number;
   tmdbDiscoverPages: number;
   tmdbNowPlayingPages: number;
   radarrUrl: string;
@@ -20,6 +21,7 @@ interface Config {
   radarrSearchOnAdd: boolean;
   radarrMonitored: boolean;
   radarrMinimumAvailability: MovieStatusType;
+  dryRun: boolean;
   pollIntervalHours: number;
   runOnce: boolean;
 }
@@ -207,6 +209,12 @@ function readConfig(): Config {
     "TMDB_MIN_VOTE_COUNT",
     0
   );
+  const tmdbReleaseWindowDaysConfigured = parseNumber(
+    process.env.TMDB_RELEASE_WINDOW_DAYS,
+    30,
+    "TMDB_RELEASE_WINDOW_DAYS",
+    1
+  );
   if (!radarrQualityProfileIdRaw && !radarrQualityProfileName) {
     throw new Error("Set RADARR_QUALITY_PROFILE_ID or RADARR_QUALITY_PROFILE_NAME");
   }
@@ -218,6 +226,7 @@ function readConfig(): Config {
     tmdbLanguage: process.env.TMDB_LANGUAGE?.trim() ?? "en-US",
     tmdbMinScore: parseNumber(process.env.TMDB_MIN_SCORE, 7.5, "TMDB_MIN_SCORE", 0),
     tmdbMinVoteCount: Math.max(tmdbMinVoteCountConfigured, 300),
+    tmdbReleaseWindowDays: Math.max(1, Math.floor(tmdbReleaseWindowDaysConfigured)),
     tmdbDiscoverPages: parseNumber(process.env.TMDB_DISCOVER_PAGES, 3, "TMDB_DISCOVER_PAGES", 1),
     tmdbNowPlayingPages: parseNumber(
       process.env.TMDB_NOW_PLAYING_PAGES,
@@ -237,6 +246,7 @@ function readConfig(): Config {
     radarrMinimumAvailability: normalizeMinimumAvailability(
       process.env.RADARR_MINIMUM_AVAILABILITY
     ),
+    dryRun: parseBoolean(process.env.DRY_RUN, true),
     pollIntervalHours: parseNumber(
       process.env.POLL_INTERVAL_HOURS,
       24,
@@ -336,7 +346,9 @@ class TmdbClient {
   public async fetchDigitalReleases(maxPages: number): Promise<TmdbMovie[]> {
     const windowEndDate = new Date();
     const windowStartDate = new Date(windowEndDate);
-    windowStartDate.setUTCDate(windowStartDate.getUTCDate() - 6);
+    windowStartDate.setUTCDate(
+      windowStartDate.getUTCDate() - (this.config.tmdbReleaseWindowDays - 1)
+    );
     const digitalReleaseDateEnd = windowEndDate.toISOString().slice(0, 10);
     const digitalReleaseDateStart = windowStartDate.toISOString().slice(0, 10);
     const movies = new Map<number, TmdbMovie>();
@@ -461,11 +473,25 @@ class RadarrClient {
   }
 
   public async lookupMovieByTmdbId(tmdbId: number): Promise<JsonObject | null> {
-    const response = await this.get<JsonObject[]>("/movie/lookup/tmdb", { tmdbId });
-    if (!response.length) {
-      return null;
+    try {
+      const directLookup = await this.get<JsonObject | JsonObject[]>("/movie/lookup/tmdb", {
+        tmdbId
+      });
+      if (Array.isArray(directLookup)) {
+        return directLookup[0] ?? null;
+      }
+
+      if (Object.keys(directLookup).length > 0) {
+        return directLookup;
+      }
+    } catch (error) {
+      if (!(error instanceof HttpError) || ![400, 404].includes(error.status)) {
+        throw error;
+      }
     }
-    return response[0];
+
+    const termLookup = await this.get<JsonObject[]>("/movie/lookup", { term: `tmdb:${tmdbId}` });
+    return termLookup[0] ?? null;
   }
 
   public async addMovie(moviePayload: JsonObject): Promise<void> {
@@ -524,6 +550,9 @@ async function runSync(
   qualityProfileId: number
 ): Promise<void> {
   log("INFO", "Starting sync run");
+  if (config.dryRun) {
+    log("INFO", "DRY_RUN is enabled; Radarr add requests will be logged only.");
+  }
 
   const [existingTmdbIds, nowPlayingIds, digitalCandidates] = await Promise.all([
     radarrClient.fetchExistingTmdbIds(),
@@ -542,6 +571,7 @@ async function runSync(
   );
 
   let addedCount = 0;
+  let dryRunCount = 0;
   let skippedCount = 0;
 
   for (const movie of candidates) {
@@ -554,6 +584,15 @@ async function runSync(
       }
 
       const payload = buildAddPayload(lookup, config, qualityProfileId);
+      if (config.dryRun) {
+        dryRunCount += 1;
+        log(
+          "INFO",
+          `DRY_RUN would add: ${safeMovieLabel(movie)} | qualityProfileId=${qualityProfileId} | rootFolderPath=${config.radarrRootFolderPath} | monitored=${config.radarrMonitored ? "true" : "false"} | minimumAvailability=${config.radarrMinimumAvailability} | searchForMovie=${config.radarrSearchOnAdd ? "true" : "false"}`
+        );
+        continue;
+      }
+
       await radarrClient.addMovie(payload);
       existingTmdbIds.add(movie.id);
       addedCount += 1;
@@ -580,13 +619,17 @@ async function runSync(
     }
   }
 
-  log("INFO", `Sync run complete: added=${addedCount}, skipped=${skippedCount}`);
+  log(
+    "INFO",
+    `Sync run complete: added=${addedCount}, dryRun=${dryRunCount}, skipped=${skippedCount}`
+  );
 }
 
 async function main(): Promise<void> {
   loadDotEnvFile();
   const config = readConfig();
   log("INFO", `Configured Radarr URL: ${config.radarrUrl}`);
+  log("INFO", `DRY_RUN mode: ${config.dryRun ? "enabled" : "disabled"}`);
   const tmdbClient = new TmdbClient(config);
   const radarrClient = new RadarrClient(config);
 
