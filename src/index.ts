@@ -495,25 +495,34 @@ async function runSync(
     tmdbClient.fetchDigitalReleases()
   ]);
 
-  const candidates = digitalCandidates
-    .filter((movie) => !existingTmdbIds.has(movie.id))
-    .sort((a, b) => b.release_date.localeCompare(a.release_date));
+  const candidates: TmdbMovie[] = [];
+  let prefilterSkippedCount = 0;
+  for (const movie of digitalCandidates) {
+    if (existingTmdbIds.has(movie.id)) {
+      prefilterSkippedCount += 1;
+      log("INFO", `Skipped ${safeMovieLabel(movie)} | reason=already exists in Radarr library`);
+      continue;
+    }
+
+    candidates.push(movie);
+  }
+  candidates.sort((a, b) => b.release_date.localeCompare(a.release_date));
 
   log(
     "INFO",
-    `Fetched ${digitalCandidates.length} digital candidates; ${candidates.length} remain after filtering`
+    `Fetched ${digitalCandidates.length} digital candidates; ${candidates.length} remain after filtering; skipped_prefilter=${prefilterSkippedCount}`
   );
 
   let addedCount = 0;
   let dryRunCount = 0;
-  let skippedCount = 0;
+  let skippedCount = prefilterSkippedCount;
 
   for (const movie of candidates) {
     try {
       const lookup = await radarrClient.lookupMovieByTmdbId(movie.id);
       if (!lookup) {
         skippedCount += 1;
-        log("WARN", `Radarr lookup returned no result for ${safeMovieLabel(movie)}; skipping`);
+        log("WARN", `Skipped ${safeMovieLabel(movie)} | reason=Radarr lookup returned no result`);
         continue;
       }
 
@@ -535,7 +544,7 @@ async function runSync(
       if (isAlreadyExistsError(error)) {
         existingTmdbIds.add(movie.id);
         skippedCount += 1;
-        log("INFO", `Already exists in Radarr: ${safeMovieLabel(movie)}`);
+        log("INFO", `Skipped ${safeMovieLabel(movie)} | reason=already exists in Radarr`);
         continue;
       }
 
@@ -543,13 +552,16 @@ async function runSync(
         skippedCount += 1;
         log(
           "ERROR",
-          `Failed adding ${safeMovieLabel(movie)} (HTTP ${error.status}): ${error.body.slice(0, 300)}`
+          `Skipped ${safeMovieLabel(movie)} | reason=HTTP ${error.status} while adding | body=${error.body.slice(0, 300)}`
         );
         continue;
       }
 
       skippedCount += 1;
-      log("ERROR", `Failed adding ${safeMovieLabel(movie)}: ${String(error)}`);
+      log(
+        "ERROR",
+        `Skipped ${safeMovieLabel(movie)} | reason=unexpected error while adding | error=${String(error)}`
+      );
     }
   }
 
