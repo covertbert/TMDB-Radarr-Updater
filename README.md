@@ -73,23 +73,44 @@ services:
     container_name: tmdb-radarr-digital
     restart: unless-stopped
     environment:
-      # Set one of TMDB_BEARER_TOKEN or TMDB_API_KEY.
-      TMDB_BEARER_TOKEN: ""
-      TMDB_API_KEY: "your_tmdb_api_key"
-      TMDB_LANGUAGE: "en-US"
-      TMDB_MIN_SCORE: "7"
-      TMDB_MIN_VOTE_COUNT: "500"
-      TMDB_RELEASE_WINDOW_DAYS: "14"
-      RADARR_URL: "http://radarr:7878"
-      RADARR_API_KEY: "your_radarr_api_key"
-      RADARR_ROOT_FOLDER_PATH: "/data/media/movies"
-      # Set one of RADARR_QUALITY_PROFILE_ID or RADARR_QUALITY_PROFILE_NAME.
-      RADARR_QUALITY_PROFILE_ID: ""
-      RADARR_QUALITY_PROFILE_NAME: "HD-1080p"
-      RADARR_SEARCH_ON_ADD: "true"
-      RADARR_MONITORED: "true"
-      RADARR_MINIMUM_AVAILABILITY: "released"
+      TZ: Europe/London
+      TMDB_BEARER_TOKEN: ${TMDB_BEARER_TOKEN:-}
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
+      TMDB_LANGUAGE: ${TMDB_LANGUAGE}
+      TMDB_MIN_SCORE: ${TMDB_MIN_SCORE}
+      TMDB_MIN_VOTE_COUNT: ${TMDB_MIN_VOTE_COUNT}
+      TMDB_RELEASE_WINDOW_DAYS: ${TMDB_RELEASE_WINDOW_DAYS}
+      RADARR_URL: ${RADARR_URL}
+      RADARR_API_KEY: ${RADARR_API_KEY}
+      RADARR_ROOT_FOLDER_PATH: ${RADARR_ROOT_FOLDER_PATH}
+      RADARR_QUALITY_PROFILE_ID: ${RADARR_QUALITY_PROFILE_ID:-}
+      RADARR_QUALITY_PROFILE_NAME: ${RADARR_QUALITY_PROFILE_NAME:-}
+      RADARR_SEARCH_ON_ADD: ${RADARR_SEARCH_ON_ADD}
+      RADARR_MONITORED: ${RADARR_MONITORED}
+      RADARR_MINIMUM_AVAILABILITY: ${RADARR_MINIMUM_AVAILABILITY}
+      DRY_RUN: ${DRY_RUN}
+    command: ["tail", "-f", "/dev/null"]
+    labels:
+      ofelia.enabled: "true"
+      # Every Monday at 05:00 (container timezone).
+      ofelia.job-exec.tmdb-radarr-sync.schedule: "0 5 * * 1"
+      ofelia.job-exec.tmdb-radarr-sync.command: "node dist/index.js"
+      ofelia.job-exec.tmdb-radarr-sync.no-overlap: "true"
+
+  ofelia:
+    image: mcuadros/ofelia:latest
+    container_name: ofelia
+    restart: unless-stopped
+    depends_on:
+      - tmdb-radarr-digital
+    environment:
+      TZ: Europe/London
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 ```
+
+Set those variables in Synology Container Manager project environment (or your Docker environment) before deployment.
 
 You can also use [docker-compose.yml](/Users/bertieblackman/Projects/movie-star/docker-compose.yml) directly.
 
@@ -98,8 +119,9 @@ For local development, the app still loads `.env` automatically at runtime.
 ## Environment variables
 
 - Single source of truth: `.env.example`.
-- Copy it to `.env` and set values there.
-- The app has no fallback defaults in code; all variables must be set in `.env` (or injected environment).
+- Local run: copy it to `.env` and set values there.
+- Docker/Synology run: inject the same keys as container environment variables.
+- The app has no fallback defaults in code; all required variables must be set.
 - Pair requirements:
 - Set one of `TMDB_BEARER_TOKEN` or `TMDB_API_KEY`.
 - Set one of `RADARR_QUALITY_PROFILE_ID` or `RADARR_QUALITY_PROFILE_NAME`.
@@ -107,7 +129,7 @@ For local development, the app still loads `.env` automatically at runtime.
 ## Notes
 
 - The app always performs a single sync run, then exits.
-- Schedule recurrence in your container manager (for example a weekly scheduled task).
+- In this compose, Ofelia handles recurrence (weekly cron by default).
 - Recommended for new, high-signal releases: `TMDB_RELEASE_WINDOW_DAYS=14`.
 - Set `DRY_RUN=true` when you want a dry run.
 - This project uses TMDb data but is not endorsed or certified by TMDb.
