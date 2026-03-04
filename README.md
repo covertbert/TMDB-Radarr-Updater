@@ -66,7 +66,8 @@ Image naming and tags:
 
 Use [docker-compose.snippet.yml](/Users/bertieblackman/Projects/movie-star/docker-compose.snippet.yml) as a base and paste the service into your arr stack compose.
 
-The snippet uses `env_file` so `.env` is the single source of truth for app configuration.
+The snippet uses explicit `environment` variables so you can set values directly in Container Manager compose/deploy settings.
+For local development, the app still loads `.env` automatically at runtime.
 
 ## Environment variables
 
