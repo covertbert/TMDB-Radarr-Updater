@@ -36,6 +36,32 @@ docker build -t local/tmdb-radarr-digital:latest .
 docker run --rm --env-file .env local/tmdb-radarr-digital:latest
 ```
 
+## Docker Hub publish (GitHub Actions)
+
+This repo includes [docker-publish.yml](/Users/bertieblackman/Projects/movie-star/.github/workflows/docker-publish.yml), which builds and pushes a multi-arch image (`linux/amd64`, `linux/arm64`) to Docker Hub.
+
+Setup once in GitHub repository settings:
+
+1. Create a Docker Hub Access Token.
+2. Add GitHub Actions secrets:
+   - `DOCKERHUB_USERNAME`
+   - `DOCKERHUB_TOKEN`
+3. Ensure your Docker Hub repo name matches your GitHub repo name (currently `movie-star`) under that username.
+
+Publish triggers:
+
+- Push to `main`
+- Push a tag like `v1.0.0`
+- Manual run via `workflow_dispatch`
+
+Image naming and tags:
+
+- Image: `docker.io/<DOCKERHUB_USERNAME>/movie-star`
+- Tags:
+  - `latest` on default branch
+  - Git tag names (for example `v1.0.0`)
+  - commit SHA tags
+
 ## Synology compose integration
 
 Use [docker-compose.snippet.yml](/Users/bertieblackman/Projects/movie-star/docker-compose.snippet.yml) as a base and paste the service into your arr stack compose.
