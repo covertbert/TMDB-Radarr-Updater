@@ -1,0 +1,28 @@
+services:
+  tmdb-radarr-digital:
+    <<: *common-config
+    build:
+      context: /volume2/docker/movie-star
+      dockerfile: Dockerfile
+    image: local/tmdb-radarr-digital:latest
+    container_name: tmdb-radarr-digital
+    environment:
+      - PUID=1027
+      - PGID=65536
+      - TZ=Europe/London
+      - UMASK=022
+      - TMDB_BEARER_TOKEN=your_tmdb_v4_read_token
+      - TMDB_REGION=GB
+      - TMDB_LANGUAGE=en-US
+      - TMDB_MIN_SCORE=7.5
+      - TMDB_DISCOVER_PAGES=3
+      - TMDB_NOW_PLAYING_PAGES=5
+      - RADARR_URL=http://radarr:7878
+      - RADARR_API_KEY=your_radarr_api_key
+      - RADARR_ROOT_FOLDER_PATH=/data/media/movies
+      - RADARR_QUALITY_PROFILE_NAME=HD-1080p
+      - RADARR_SEARCH_ON_ADD=true
+      - RADARR_MONITORED=true
+      - RADARR_MINIMUM_AVAILABILITY=released
+      - POLL_INTERVAL_HOURS=24
+      - RUN_ONCE=false

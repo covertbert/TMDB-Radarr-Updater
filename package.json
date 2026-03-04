@@ -1,0 +1,19 @@
+{
+  "name": "tmdb-radarr-digital-sync",
+  "version": "1.0.0",
+  "description": "Sync highly rated digitally released TMDb movies into Radarr",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "check": "npm run build"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.14",
+    "typescript": "^5.8.2"
+  }
+}
