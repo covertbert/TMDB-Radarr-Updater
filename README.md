@@ -64,14 +64,14 @@ Image naming and tags:
 
 ## Synology compose integration
 
-Use this service block in your arr stack compose:
+Use this standalone compose (no shared anchors):
 
 ```yaml
 services:
   tmdb-radarr-digital:
-    <<: *common-config
     image: docker.io/covertbert/tmdb-radarr-updater:latest
     container_name: tmdb-radarr-digital
+    restart: unless-stopped
     environment:
       # Set one of TMDB_BEARER_TOKEN or TMDB_API_KEY.
       TMDB_BEARER_TOKEN: ""
@@ -89,8 +89,9 @@ services:
       RADARR_SEARCH_ON_ADD: "true"
       RADARR_MONITORED: "true"
       RADARR_MINIMUM_AVAILABILITY: "released"
-      DRY_RUN: "false"
 ```
+
+You can also use [docker-compose.yml](/Users/bertieblackman/Projects/movie-star/docker-compose.yml) directly.
 
 For local development, the app still loads `.env` automatically at runtime.
 
