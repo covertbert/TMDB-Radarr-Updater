@@ -10,7 +10,6 @@ interface Config {
   tmdbMinScore: number;
   tmdbMinVoteCount: number;
   tmdbReleaseWindowDays: number;
-  tmdbPrimaryReleaseDateGte: string;
   radarrUrl: string;
   radarrApiKey: string;
   radarrRootFolderPath: string;
@@ -114,14 +113,6 @@ function optionalString(name: string): string | undefined {
   return value ?? undefined;
 }
 
-function requiredDateString(name: string): string {
-  const value = requiredString(name);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new Error(`Invalid date value in ${name}: ${value}. Use YYYY-MM-DD format.`);
-  }
-  return value;
-}
-
 function parseNumber(value: string, envName: string, min?: number): number {
   const parsed = Number(value);
   if (Number.isNaN(parsed) || !Number.isFinite(parsed)) {
@@ -209,9 +200,8 @@ function readConfig(): Config {
     tmdbApiKey,
     tmdbLanguage: requiredString("TMDB_LANGUAGE"),
     tmdbMinScore: parseNumber(requiredString("TMDB_MIN_SCORE"), "TMDB_MIN_SCORE", 0),
-    tmdbMinVoteCount: Math.max(tmdbMinVoteCountConfigured, 300),
+    tmdbMinVoteCount: Math.max(tmdbMinVoteCountConfigured, 500),
     tmdbReleaseWindowDays: Math.max(1, Math.floor(tmdbReleaseWindowDaysConfigured)),
-    tmdbPrimaryReleaseDateGte: requiredDateString("TMDB_PRIMARY_RELEASE_DATE_GTE"),
     radarrUrl: normalizeUrl(requiredString("RADARR_URL")),
     radarrApiKey: requiredString("RADARR_API_KEY"),
     radarrRootFolderPath: requiredString("RADARR_ROOT_FOLDER_PATH"),
@@ -298,8 +288,11 @@ class TmdbClient {
     windowStartDate.setUTCDate(
       windowStartDate.getUTCDate() - (this.config.tmdbReleaseWindowDays - 1)
     );
+    const primaryReleaseDateFloor = new Date(windowEndDate);
+    primaryReleaseDateFloor.setUTCFullYear(primaryReleaseDateFloor.getUTCFullYear() - 1);
     const digitalReleaseDateEnd = windowEndDate.toISOString().slice(0, 10);
     const digitalReleaseDateStart = windowStartDate.toISOString().slice(0, 10);
+    const primaryReleaseDateGte = primaryReleaseDateFloor.toISOString().slice(0, 10);
     const movies = new Map<number, TmdbMovie>();
 
     for (let page = 1; ; page += 1) {
@@ -312,7 +305,7 @@ class TmdbClient {
         with_release_type: 4,
         "release_date.gte": digitalReleaseDateStart,
         "release_date.lte": digitalReleaseDateEnd,
-        "primary_release_date.gte": this.config.tmdbPrimaryReleaseDateGte,
+        "primary_release_date.gte": primaryReleaseDateGte,
         "vote_average.gte": this.config.tmdbMinScore,
         "vote_count.gte": this.config.tmdbMinVoteCount
       });
