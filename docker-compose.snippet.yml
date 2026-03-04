@@ -27,5 +27,3 @@ services:
       - RADARR_MONITORED=true
       - RADARR_MINIMUM_AVAILABILITY=released
       - DRY_RUN=true
-      - POLL_INTERVAL_HOURS=24
-      - RUN_ONCE=false

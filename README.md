@@ -24,7 +24,7 @@ Rules implemented:
 ```bash
 npm install
 npm run build
-RUN_ONCE=true node dist/index.js
+node dist/index.js
 ```
 
 3. For Docker:
@@ -63,13 +63,11 @@ Optional (defaults):
 - `RADARR_MONITORED=true`
 - `RADARR_MINIMUM_AVAILABILITY=released`
 - `DRY_RUN=true` (when `true`, logs what would be added and does not call Radarr add)
-- `POLL_INTERVAL_HOURS=24`
-- `RUN_ONCE=false`
 
 ## Notes
 
-- `RUN_ONCE=false` runs forever and sleeps between syncs.
+- The app always performs a single sync run, then exits.
+- Schedule recurrence in your container manager (for example a weekly scheduled task).
 - Weekly cadence is supported; set `TMDB_RELEASE_WINDOW_DAYS=7` for strict weekly-only matching.
 - Set `DRY_RUN=false` when you want real Radarr add calls.
-- `RUN_ONCE=true` is useful for testing.
 - This project uses TMDb data but is not endorsed or certified by TMDb.

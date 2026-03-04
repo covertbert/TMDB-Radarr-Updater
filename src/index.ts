@@ -22,8 +22,6 @@ interface Config {
   radarrMonitored: boolean;
   radarrMinimumAvailability: MovieStatusType;
   dryRun: boolean;
-  pollIntervalHours: number;
-  runOnce: boolean;
 }
 
 interface TmdbMovie {
@@ -246,14 +244,7 @@ function readConfig(): Config {
     radarrMinimumAvailability: normalizeMinimumAvailability(
       process.env.RADARR_MINIMUM_AVAILABILITY
     ),
-    dryRun: parseBoolean(process.env.DRY_RUN, true),
-    pollIntervalHours: parseNumber(
-      process.env.POLL_INTERVAL_HOURS,
-      24,
-      "POLL_INTERVAL_HOURS",
-      0.25
-    ),
-    runOnce: parseBoolean(process.env.RUN_ONCE, false)
+    dryRun: parseBoolean(process.env.DRY_RUN, true)
   };
 }
 
@@ -499,12 +490,6 @@ class RadarrClient {
   }
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 function buildAddPayload(
   lookupMovie: JsonObject,
   config: Config,
@@ -636,23 +621,8 @@ async function main(): Promise<void> {
   await radarrClient.verifyRootFolderPath();
   const qualityProfileId = await radarrClient.resolveQualityProfileId();
   log("INFO", `Using Radarr quality profile id ${qualityProfileId}`);
-
-  if (config.runOnce) {
-    await runSync(config, tmdbClient, radarrClient, qualityProfileId);
-    return;
-  }
-
-  const intervalMs = Math.round(config.pollIntervalHours * 60 * 60 * 1000);
-  while (true) {
-    try {
-      await runSync(config, tmdbClient, radarrClient, qualityProfileId);
-    } catch (error) {
-      log("ERROR", `Sync run failed: ${String(error)}`);
-    }
-
-    log("INFO", `Sleeping for ${config.pollIntervalHours} hour(s) before next run`);
-    await sleep(intervalMs);
-  }
+  await runSync(config, tmdbClient, radarrClient, qualityProfileId);
+  log("INFO", "Single run complete");
 }
 
 main().catch((error: unknown) => {
