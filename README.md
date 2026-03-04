@@ -64,9 +64,34 @@ Image naming and tags:
 
 ## Synology compose integration
 
-Use [docker-compose.snippet.yml](/Users/bertieblackman/Projects/movie-star/docker-compose.snippet.yml) as a base and paste the service into your arr stack compose.
+Use this service block in your arr stack compose:
 
-The snippet uses explicit `environment` variables so you can set values directly in Container Manager compose/deploy settings.
+```yaml
+services:
+  tmdb-radarr-digital:
+    <<: *common-config
+    image: docker.io/<dockerhub-username>/movie-star:latest
+    container_name: tmdb-radarr-digital
+    environment:
+      # Set one of TMDB_BEARER_TOKEN or TMDB_API_KEY.
+      TMDB_BEARER_TOKEN: ""
+      TMDB_API_KEY: "your_tmdb_api_key"
+      TMDB_LANGUAGE: "en-US"
+      TMDB_MIN_SCORE: "7"
+      TMDB_MIN_VOTE_COUNT: "500"
+      TMDB_RELEASE_WINDOW_DAYS: "14"
+      RADARR_URL: "http://radarr:7878"
+      RADARR_API_KEY: "your_radarr_api_key"
+      RADARR_ROOT_FOLDER_PATH: "/data/media/movies"
+      # Set one of RADARR_QUALITY_PROFILE_ID or RADARR_QUALITY_PROFILE_NAME.
+      RADARR_QUALITY_PROFILE_ID: ""
+      RADARR_QUALITY_PROFILE_NAME: "HD-1080p"
+      RADARR_SEARCH_ON_ADD: "true"
+      RADARR_MONITORED: "true"
+      RADARR_MINIMUM_AVAILABILITY: "released"
+      DRY_RUN: "false"
+```
+
 For local development, the app still loads `.env` automatically at runtime.
 
 ## Environment variables
