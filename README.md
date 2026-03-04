@@ -70,7 +70,7 @@ Use this service block in your arr stack compose:
 services:
   tmdb-radarr-digital:
     <<: *common-config
-    image: docker.io/<dockerhub-username>/movie-star:latest
+    image: docker.io/covertbert/tmdb-radarr-updater:latest
     container_name: tmdb-radarr-digital
     environment:
       # Set one of TMDB_BEARER_TOKEN or TMDB_API_KEY.
