@@ -5,8 +5,10 @@ This container polls TMDb for digitally released movies and adds them to Radarr 
 Rules implemented:
 
 - Uses TMDb discover with `with_release_type=4` (digital release).
+- Limits discover results to an inclusive 7-day digital release window (`with_release_type=4`, `release_date.gte`, `release_date.lte`).
 - Excludes movies currently returned by TMDb `now_playing` (proxy for "still in theatres").
 - Applies rating threshold (`TMDB_MIN_SCORE`, default `7.5`).
+- Requires at least `300` TMDb votes (`TMDB_MIN_VOTE_COUNT`, values lower than `300` are clamped).
 - Skips anything already in Radarr by `tmdbId`.
 
 ## Required API docs used
@@ -53,7 +55,7 @@ Optional (defaults):
 - `TMDB_REGION=GB`
 - `TMDB_LANGUAGE=en-US`
 - `TMDB_MIN_SCORE=7.5`
-- `TMDB_MIN_VOTE_COUNT=0`
+- `TMDB_MIN_VOTE_COUNT=300`
 - `TMDB_DISCOVER_PAGES=3`
 - `TMDB_NOW_PLAYING_PAGES=5`
 - `RADARR_SEARCH_ON_ADD=true`
@@ -65,5 +67,6 @@ Optional (defaults):
 ## Notes
 
 - `RUN_ONCE=false` runs forever and sleeps between syncs.
+- Weekly cadence is supported by the built-in 7-day TMDb release window.
 - `RUN_ONCE=true` is useful for testing.
 - This project uses TMDb data but is not endorsed or certified by TMDb.

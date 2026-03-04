@@ -15,6 +15,7 @@ services:
       - TMDB_REGION=GB
       - TMDB_LANGUAGE=en-US
       - TMDB_MIN_SCORE=7.5
+      - TMDB_MIN_VOTE_COUNT=300
       - TMDB_DISCOVER_PAGES=3
       - TMDB_NOW_PLAYING_PAGES=5
       - RADARR_URL=http://radarr:7878

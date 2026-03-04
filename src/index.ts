@@ -201,6 +201,12 @@ function readConfig(): Config {
 
   const radarrQualityProfileIdRaw = optionalString("RADARR_QUALITY_PROFILE_ID");
   const radarrQualityProfileName = optionalString("RADARR_QUALITY_PROFILE_NAME");
+  const tmdbMinVoteCountConfigured = parseNumber(
+    process.env.TMDB_MIN_VOTE_COUNT,
+    300,
+    "TMDB_MIN_VOTE_COUNT",
+    0
+  );
   if (!radarrQualityProfileIdRaw && !radarrQualityProfileName) {
     throw new Error("Set RADARR_QUALITY_PROFILE_ID or RADARR_QUALITY_PROFILE_NAME");
   }
@@ -211,7 +217,7 @@ function readConfig(): Config {
     tmdbRegion: process.env.TMDB_REGION?.trim() ?? "GB",
     tmdbLanguage: process.env.TMDB_LANGUAGE?.trim() ?? "en-US",
     tmdbMinScore: parseNumber(process.env.TMDB_MIN_SCORE, 7.5, "TMDB_MIN_SCORE", 0),
-    tmdbMinVoteCount: parseNumber(process.env.TMDB_MIN_VOTE_COUNT, 0, "TMDB_MIN_VOTE_COUNT", 0),
+    tmdbMinVoteCount: Math.max(tmdbMinVoteCountConfigured, 300),
     tmdbDiscoverPages: parseNumber(process.env.TMDB_DISCOVER_PAGES, 3, "TMDB_DISCOVER_PAGES", 1),
     tmdbNowPlayingPages: parseNumber(
       process.env.TMDB_NOW_PLAYING_PAGES,
@@ -328,7 +334,11 @@ class TmdbClient {
   }
 
   public async fetchDigitalReleases(maxPages: number): Promise<TmdbMovie[]> {
-    const today = new Date().toISOString().slice(0, 10);
+    const windowEndDate = new Date();
+    const windowStartDate = new Date(windowEndDate);
+    windowStartDate.setUTCDate(windowStartDate.getUTCDate() - 6);
+    const digitalReleaseDateEnd = windowEndDate.toISOString().slice(0, 10);
+    const digitalReleaseDateStart = windowStartDate.toISOString().slice(0, 10);
     const movies = new Map<number, TmdbMovie>();
 
     for (let page = 1; page <= maxPages; page += 1) {
@@ -338,9 +348,10 @@ class TmdbClient {
         language: this.config.tmdbLanguage,
         page,
         region: this.config.tmdbRegion,
-        sort_by: "primary_release_date.desc",
+        sort_by: "release_date.desc",
         with_release_type: 4,
-        "release_date.lte": today,
+        "release_date.gte": digitalReleaseDateStart,
+        "release_date.lte": digitalReleaseDateEnd,
         "vote_average.gte": this.config.tmdbMinScore,
         "vote_count.gte": this.config.tmdbMinVoteCount
       });
